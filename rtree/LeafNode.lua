@@ -4,17 +4,6 @@ local Node = require "rtree.Node"
 local M = {}
 setmetatable(M, {__index = Node})
 
-local meta = {
-  name = "LeafNode",
-  __index = M,
-  __tostring = M.tostring,
-}
-
-function M.new(children)
-  local self = Node.new(children)
-  return setmetatable(self, meta)
-end
-
 function M.is_leaf()
   return true
 end
@@ -27,7 +16,23 @@ function M:insert(entry)
 end
 
 function M:tostring()
-  return "LeafNode("..tostring(self.bounding_box)..")"
+  local s = "Leaf("..tostring(self.bounding_box)..":"
+  for i=1,#self.children-1 do
+    s = s..tostring(self.children[i].bounding_box)..","
+  end
+  return s..tostring(self.children[#self.children].bounding_box)..")"
+end
+
+local meta = {
+  name = "LeafNode",
+  __index = M,
+  __tostring = M.tostring,
+}
+
+function M.new(children)
+  local self = Node.new(children)
+  self.height = 0
+  return setmetatable(self, meta)
 end
 
 return M

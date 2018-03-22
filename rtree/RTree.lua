@@ -7,7 +7,6 @@ local serpent = require "serpent"
 --[[
   tree = {
     root = ...,
-    height = ...?
   }
 ]]
 local M = {}
@@ -15,7 +14,6 @@ local M = {}
 function M.new()
   local self = {
     root = LeafNode.new{},
-    height = 1,
   }
   return setmetatable(self, {__index = M})
 end
@@ -66,7 +64,6 @@ local function overflow_treatment(self, path, reinsert_levels)
     if level == 1 then
       -- need a new root
       self.root = IndexNode.new({node, new_sibling})
-      self.height = self.height + 1
     else
       if path[level-1]:insert(new_sibling) then
         path[level] = nil
@@ -132,7 +129,6 @@ local function condense_tree(self, path)
       node:update_bounding_box()
     end
   end
-  print("reinserting: "..serpent.block(to_reinsert))
   for i=1,#to_reinsert do
     insert(self, to_reinsert[i][1], {}, to_reinsert[i][2])
   end
@@ -145,7 +141,6 @@ function M:delete(datum)
   end
   condense_tree(self, path)
   if not self.root:is_leaf() and #self.root.children == 1 then
-    print("collapsing root")
     self.root = self.root.children[1]
   end
   return true

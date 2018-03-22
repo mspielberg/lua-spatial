@@ -41,6 +41,9 @@ function M:contains(other)
 end
 
 function M:enlarge_in_place(other)
+  if self == M.EMPTY then
+    error("attempted to modify EMPTY")
+  end
   self[1] = min(self[1], other[1])
   self[2] = min(self[2], other[2])
   self[3] = max(self[3], other[3])
@@ -67,9 +70,9 @@ end
 
 function M:tostring()
   if self == M.EMPTY then
-    return "BoundingBox()"
+    return "EmptyBB()"
   end
-  return "BoundingBox("..self[1]..","..self[2]..","..self[3]..","..self[4]..")"
+  return "BB("..self[1]..","..self[2]..","..self[3]..","..self[4]..")"
 end
 
 local meta = {
