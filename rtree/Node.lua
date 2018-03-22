@@ -1,5 +1,7 @@
 local BoundingBox = require "rtree.BoundingBox"
 
+local serpent = require "serpent"
+
 --[[
   {
     bounding_box = BoundingBox(...),
@@ -91,15 +93,20 @@ local function choose_split(self)
   return best_sorted, best_split_index
 end
 
+function M:update_bounding_box()
+  self.bounding_box = group_bb(self.children)
+end
+
 function M:split()
   local sorted, split_index = choose_split(self)
   local new_node_children = {}
-  for i=1,#sorted-split_index+1 do
-    new_node_children[i] = sorted[i + split_index - 1]
-    sorted[i + split_index - 1] = nil
+  for i=1,#sorted-split_index do
+    new_node_children[i] = sorted[i + split_index]
+    sorted[i + split_index] = nil
   end
   local new_node = self.new(new_node_children)
   self.children = sorted
+  self:update_bounding_box()
   self.bounding_box = group_bb(self.children)
   return new_node
 end
@@ -117,8 +124,8 @@ function M:remove(child)
   for i=1,#children do
     if children[i] == child then
       table.remove(self.children, i)
-      self.bounding_box = group_bb(self.children)
-      return
+      self:update_bounding_box()
+      return #children < MIN_CHILDREN
     end
   end
   error("remove called with non-child")

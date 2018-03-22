@@ -36,6 +36,10 @@ function M:margin()
   return 2 * ((self[3] - self[1]) + (self[4] - self[2]))
 end
 
+function M:contains(other)
+  return self[1] <= other[1] and self[2] <= other[2] and self[3] >= other[3] and self[4] >= other[4]
+end
+
 function M:enlarge_in_place(other)
   self[1] = min(self[1], other[1])
   self[2] = min(self[2], other[2])
@@ -62,6 +66,9 @@ function M:intersect(other)
 end
 
 function M:tostring()
+  if self == M.EMPTY then
+    return "BoundingBox()"
+  end
   return "BoundingBox("..self[1]..","..self[2]..","..self[3]..","..self[4]..")"
 end
 

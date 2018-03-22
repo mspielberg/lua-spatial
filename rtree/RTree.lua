@@ -1,3 +1,4 @@
+local Entry = require "rtree.Entry"
 local IndexNode = require "rtree.IndexNode"
 local LeafNode = require "rtree.LeafNode"
 
@@ -6,13 +7,15 @@ local serpent = require "serpent"
 --[[
   tree = {
     root = ...,
+    height = ...?
   }
 ]]
 local M = {}
 
 function M.new()
   local self = {
-    root = LeafNode.new{}
+    root = LeafNode.new{},
+    height = 1,
   }
   return setmetatable(self, {__index = M})
 end
@@ -38,22 +41,20 @@ local function choose_child(node, to_insert_bb)
 end
 
 local function choose_subtree(self, to_insert_bb, desired_level)
-  if not to_insert_bb then error("to_insert_bb") end
-  desired_level = desired_level or math.huge
   local path = {self.root}
-  local level = 1
-  local node = self.root
-  while not node:is_leaf() and level < desired_level do
-    node = choose_child(node, to_insert_bb)
-    level = level + 1
-    path[level] = node
+  for level=1,desired_level do
+    if path[level]:is_leaf() then
+      return path
+    end
+    path[level+1] = choose_child(path[level], to_insert_bb)
   end
-  return path, level
+  return path
 end
 
 local insert
 
-local function overflow_treatment(self, path, level, reinsert_levels)
+local function overflow_treatment(self, path, reinsert_levels)
+  local level = #path
   local node = path[level]
   if not reinsert_levels[level] then
     reinsert_levels[level] = true
@@ -65,25 +66,89 @@ local function overflow_treatment(self, path, level, reinsert_levels)
     if level == 1 then
       -- need a new root
       self.root = IndexNode.new({node, new_sibling})
+      self.height = self.height + 1
     else
-      local parent = path[level-1]
-      if parent:insert(new_sibling) then
-        overflow_treatment(self, path, level-1, reinsert_levels)
+      if path[level-1]:insert(new_sibling) then
+        path[level] = nil
+        overflow_treatment(self, path, reinsert_levels)
       end
     end
   end
 end
 
 insert = function(self, node, reinsert_levels, desired_level)
-  local path, level = choose_subtree(self, node.bounding_box, desired_level)
-  local overfilled = path[level]:insert(node)
+  local path = choose_subtree(self, node.bounding_box, desired_level)
+  local overfilled = path[#path]:insert(node)
   if overfilled then
-    overflow_treatment(self, path, level, reinsert_levels)
+    overflow_treatment(self, path, reinsert_levels)
   end
 end
 
 function M:insert(datum)
-  insert(self, datum, {}, nil)
+  insert(self, Entry.new(datum), {}, math.huge)
+end
+
+local function find_leaf(node, entry, path)
+  local children = node.children
+  if node:is_leaf() then
+    for i=1,#children do
+      if children[i].datum == entry.datum then
+        path[#path+1] = children[i]
+        return path
+      end
+    end
+  else
+    for i=1,#children do
+      local child = children[i]
+      if child.bounding_box:contains(entry.bounding_box) then
+        path[#path+1] = child
+        if find_leaf(child, entry, path) then
+          return path
+        end
+      end
+    end
+  end
+  return nil
+end
+
+local function condense_tree(self, path)
+  local to_reinsert = {}
+  local to_remove = path[#path]
+  for depth=#path-1,1,-1 do
+    local node = path[depth]
+    if to_remove then
+      local underfilled = node:remove(to_remove)
+      if underfilled then
+        to_remove = node
+        if depth > 1 then
+          for i=1,#node.children do
+            to_reinsert[#to_reinsert+1] = {node.children[i], depth+1}
+          end
+        end
+      else
+        to_remove = nil
+      end
+    else
+      node:update_bounding_box()
+    end
+  end
+  print("reinserting: "..serpent.block(to_reinsert))
+  for i=1,#to_reinsert do
+    insert(self, to_reinsert[i][1], {}, to_reinsert[i][2])
+  end
+end
+
+function M:delete(datum)
+  local path = find_leaf(self.root, Entry.new(datum), {self.root})
+  if not path then
+    return false
+  end
+  condense_tree(self, path)
+  if not self.root:is_leaf() and #self.root.children == 1 then
+    print("collapsing root")
+    self.root = self.root.children[1]
+  end
+  return true
 end
 
 return M

@@ -19,21 +19,11 @@ function M.is_leaf()
   return true
 end
 
-function M:insert(datum)
-  if not next(self.children) then
-    local bb = datum.bounding_box
-    if bb.left_top then
-      self.bounding_box = BoundingBox.new(
-        bb.left_top.x,
-        bb.left_top.y,
-        bb.right_bottom.x,
-        bb.right_bottom.y
-      )
-    else
-      self.bounding_box = BoundingBox.new(table.unpack(bb))
-    end
+function M:insert(entry)
+  if self.bounding_box == BoundingBox.EMPTY then
+    self.bounding_box = entry.bounding_box:clone()
   end
-  return Node.insert(self, datum)
+  return Node.insert(self, entry)
 end
 
 function M:tostring()
