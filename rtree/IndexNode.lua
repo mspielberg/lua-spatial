@@ -4,7 +4,6 @@ local serpent = require "serpent"
 local M = {}
 setmetatable(M, {__index = Node})
 
-
 function M.is_leaf()
   return false
 end

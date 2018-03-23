@@ -2,17 +2,21 @@ local Entry = require "rtree.Entry"
 local IndexNode = require "rtree.IndexNode"
 local LeafNode = require "rtree.LeafNode"
 
+local NearestNeighbor = require "rtree.NearestNeighbor"
+
 local serpent = require "serpent"
 
 --[[
   tree = {
+    dimension = ...,
     root = ...,
   }
 ]]
 local M = {}
 
-function M.new()
+function M.new(dimension)
   local self = {
+    dimension = dimension,
     root = LeafNode.new{},
   }
   return setmetatable(self, {__index = M})
@@ -82,7 +86,11 @@ insert = function(self, node, reinsert_levels, desired_level)
 end
 
 function M:insert(datum)
-  insert(self, Entry.new(datum), {}, math.huge)
+  local entry = Entry.new(datum)
+  if #entry.bounding_box ~= self.dimension * 2 then
+    error("entry with bounding box of "..#entry.bounding_box.." elements does not match dimension of "..self.dimension)
+  end
+  insert(self, entry, {}, math.huge)
 end
 
 local function find_leaf(node, entry, path)
@@ -144,6 +152,10 @@ function M:delete(datum)
     self.root = self.root.children[1]
   end
   return true
+end
+
+function M:nearest_neighbor(point)
+  return NearestNeighbor.search(self.root, point)
 end
 
 return M

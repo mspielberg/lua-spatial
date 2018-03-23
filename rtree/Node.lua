@@ -6,12 +6,10 @@ local serpent = require "serpent"
   {
     bounding_box = BoundingBox(...),
     children = {...},
-    is_leaf = true,
   }
 ]]
 local M = {}
 
-local NUM_AXES = 2
 local MIN_CHILDREN = 2
 local MAX_CHILDREN = 4
 
@@ -38,7 +36,7 @@ end
 
 local function axis_metric(axis)
   local lower = axis
-  local upper = NUM_AXES + axis
+  local upper = axis + 1
   return function(a,b)
     local a_bb = a.bounding_box
     local b_bb = b.bounding_box
@@ -81,7 +79,7 @@ local function choose_split(self)
   local best_sorted
   local best_split_index
   local smallest_margin = math.huge
-  for axis=1,NUM_AXES do
+  for axis=1,#self.bounding_box/2 do
     local sorted = sort_by_metric(children, axis_metric(axis))
     local margin_sum, split_index = split_metrics(sorted)
     if margin_sum < smallest_margin then
@@ -133,7 +131,7 @@ end
 
 local function distance_2(p1, p2)
   local out = 0
-  for i=1,NUM_AXES do
+  for i=1,#p1 do
     local delta = p1[i] - p2[i]
     out = out + delta * delta
   end

@@ -1,8 +1,13 @@
 --[[
+An N-dimensional hyperrectangle.
+The N-th axis lower bound resides at index 2*N - 1, with the upper bound at index 2*N.
+For a 2-D rectangle with axes in X,Y order and a +Y in the downwards direction, that maps to:
+{
   [1] = left,
-  [2] = top,
-  [3] = right,
+  [2] = right,
+  [3] = top,
   [4] = bottom,
+}
 ]]
 local M = {}
 
@@ -21,33 +26,55 @@ local function max(a, b)
 end
 
 function M:clone()
-  return M.new(self[1], self[2], self[3], self[4])
+  return M.new(self)
 end
 
 function M:centroid()
-  return {(self[1] + self[3]) / 2, (self[2] + self[4]) / 2}
+  local out = {}
+  for axis=1,#self/2 do
+    local lower = 2 * axis - 1
+    local upper = lower + 1
+    out[axis] = (self[lower] + self[upper]) / 2
+  end
+  return out
 end
 
 function M:area()
-  return (self[3] - self[1]) * (self[4] - self[2])
+  local out = 1
+  for lower=1,#self,2 do
+    local upper = lower + 1
+    out = out * (self[upper] - self[lower])
+  end
+  return out
 end
 
 function M:margin()
-  return 2 * ((self[3] - self[1]) + (self[4] - self[2]))
+  local out = 0
+  for lower=1,#self,2 do
+    local upper = lower + 1
+    out = out + (self[upper] - self[lower])
+  end
+  return out * 2
 end
 
 function M:contains(other)
-  return self[1] <= other[1] and self[2] <= other[2] and self[3] >= other[3] and self[4] >= other[4]
+  for lower=1,#self,2 do
+    local upper = lower + 1
+    if self[lower] > other[lower] or self[upper] < other[upper] then
+      return false
+    end
+  end
 end
 
 function M:enlarge_in_place(other)
   if self == M.EMPTY then
     error("attempted to modify EMPTY")
   end
-  self[1] = min(self[1], other[1])
-  self[2] = min(self[2], other[2])
-  self[3] = max(self[3], other[3])
-  self[4] = max(self[4], other[4])
+  for lower=1,#self,2 do
+    local upper = lower + 1
+    self[lower] = min(self[lower], other[lower])
+    self[upper] = max(self[upper], other[upper])
+  end
 end
 
 function M:enlarge(other)
@@ -60,20 +87,52 @@ function M:enlarge(other)
 end
 
 function M:intersect(other)
-  return M.new(
-    max(self[1], other[1]),
-    max(self[2], other[2]),
-    min(self[3], other[3]),
-    min(self[4], other[4])
-  )
+  local bounds = {}
+  for lower=1,#self,2 do
+    local upper = lower + 1
+    bounds[lower] = max(self[lower], other[lower])
+    bounds[upper] = min(self[upper], other[upper])
+  end
+  return M.new(bounds)
 end
 
 function M:tostring()
-  if self == M.EMPTY then
-    return "EmptyBB()"
+  local min_coord = {}
+  local max_coord = {}
+  for i=1,#self/2 do
+    min_coord[i] = self[2 * i - 1]
+    max_coord[i] = self[2 * i]
   end
-  return "BB("..self[1]..","..self[2]..","..self[3]..","..self[4]..")"
+  return "BB("..table.concat(min_coord, ",")..";"..table.concat(max_coord, ",")..")"
 end
+
+-- model empty bounding box as a subclass
+local EmptyBB = {}
+
+function EmptyBB.centroid(_)
+  error("EmptyBB has no centroid")
+end
+function EmptyBB.area(_)
+  return 0
+end
+function EmptyBB.contains(_)
+  return false
+end
+function EmptyBB.enlarge_in_place(_)
+  error("attempted to modify EmptyBB")
+end
+function EmptyBB.intersect(other)
+  return other:clone()
+end
+function EmptyBB.tostring()
+  return "EmptyBB()"
+end
+
+local EmptyBB_meta = {
+  __index = M,
+  __tostring = EmptyBB.tostring,
+}
+M.EMPTY = setmetatable(EmptyBB, EmptyBB_meta)
 
 local meta = {
   name = "BoundingBox",
@@ -81,13 +140,19 @@ local meta = {
   __tostring = M.tostring,
 }
 
-M.EMPTY = setmetatable({math.huge, math.huge, -math.huge, -math.huge}, meta)
-
-function M.new(left, top, right, bottom)
-  if left > right or top > bottom then
-    return M.EMPTY
+function M.new(coords)
+  for lower=1,#coords,2 do
+    local upper = lower + 1
+    if coords[lower] > coords[upper] then
+      return M.EMPTY
+    end
   end
-  return setmetatable({left, top, right, bottom}, meta)
+  -- defensive copy
+  local copy = {}
+  for i=1,#coords do
+    copy[i] = coords[i]
+  end
+  return setmetatable(copy, meta)
 end
 
 return M
