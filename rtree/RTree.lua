@@ -14,7 +14,7 @@ local M = {}
 
 function M.new(dimension)
   local self = {
-    dimension = dimension,
+    dimension = dimension or 2,
     root = LeafNode.new{},
   }
   return setmetatable(self, {__index = M})
