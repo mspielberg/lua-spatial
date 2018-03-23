@@ -148,7 +148,15 @@ local meta = {
   __tostring = M.tostring,
 }
 
+local function new_from_factorio(bb)
+  return M.new{bb.left_top.x, bb.right_bottom.x, bb.left_top.y, bb.right_bottom.y}
+end
+
 function M.new(coords)
+  if coords.left_top then
+    return new_from_factorio(coords)
+  end
+
   for lower=1,#coords,2 do
     local upper = lower + 1
     if coords[lower] > coords[upper] then

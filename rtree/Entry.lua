@@ -8,14 +8,8 @@ local meta = {
 }
 
 function M.new(datum)
-  local bb = datum.bounding_box
-  if bb.left_top then
-    bb = BoundingBox.new{bb.left_top.x, bb.right_bottom.x, bb.left_top.y, bb.right_bottom.y}
-  else
-    bb = BoundingBox.new(bb)
-  end
   local self = {
-    bounding_box = bb,
+    bounding_box = BoundingBox.new(datum.bounding_box),
     datum = datum,
   }
   return setmetatable(self, meta)
