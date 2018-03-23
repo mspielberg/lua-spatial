@@ -57,6 +57,16 @@ function M:margin()
   return out * 2
 end
 
+function M:intersects(other)
+  for lower=1,#self,2 do
+    local upper = lower + 1
+    if self[lower] > other[upper] or self[upper] < other[lower] then
+      return false
+    end
+  end
+  return true
+end
+
 function M:contains(other)
   for lower=1,#self,2 do
     local upper = lower + 1
@@ -64,12 +74,10 @@ function M:contains(other)
       return false
     end
   end
+  return true
 end
 
 function M:enlarge_in_place(other)
-  if self == M.EMPTY then
-    error("attempted to modify EMPTY")
-  end
   for lower=1,#self,2 do
     local upper = lower + 1
     self[lower] = min(self[lower], other[lower])

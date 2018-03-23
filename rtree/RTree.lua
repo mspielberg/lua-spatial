@@ -1,10 +1,8 @@
+local BoundingBox = require "rtree.BoundingBox"
 local Entry = require "rtree.Entry"
 local IndexNode = require "rtree.IndexNode"
 local LeafNode = require "rtree.LeafNode"
-
 local NearestNeighbor = require "rtree.NearestNeighbor"
-
-local serpent = require "serpent"
 
 --[[
   tree = {
@@ -142,6 +140,8 @@ local function condense_tree(self, path)
   end
 end
 
+-- delete removes datum from the tree, returning true if successful or false if
+-- datum is not found.
 function M:delete(datum)
   local path = find_leaf(self.root, Entry.new(datum), {self.root})
   if not path then
@@ -154,8 +154,30 @@ function M:delete(datum)
   return true
 end
 
-function M:nearest_neighbor(point)
-  return NearestNeighbor.search(self.root, point)
+local function search_core(node, bb, out)
+  local children = node.children
+  for i=1,#children do
+    local child = children[i]
+    if child.bounding_box:intersects(bb) then
+      if node:is_leaf() then
+        out[#out+1] = child.datum
+      else
+        search_core(child, bb, out)
+      end
+    end
+  end
+end
+
+-- search returns all data with bounding_box overlapping bb.
+function M:search(bb)
+  local out = {}
+  search_core(self.root, BoundingBox.new(bb), out)
+  return out
+end
+
+-- nearest_neighbors returns up to k data with centroids closest to point.
+function M:nearest_neighbors(point, k)
+  return NearestNeighbor.search(self.root, point, k)
 end
 
 return M

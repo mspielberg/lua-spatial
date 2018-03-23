@@ -6,7 +6,7 @@ References:
     ACM SIGMOD, pages 71-79, 1995
 ]]
 
-local serpent = require "serpent"
+local KNearest = require "rtree.KNearest"
 
 local M = {}
 
@@ -101,15 +101,12 @@ local function centroid_metric(point)
   end
 end
 
-local function nearest_entry(leaf, metric, nearest)
+local function nearest_entry(leaf, metric, knearest)
   local entries = leaf.children
   for i=1,#entries do
     local entry = entries[i]
     local d = metric(entry)
-    if d < nearest[1] then
-      nearest[1] = d
-      nearest[2] = entry
-    end
+    knearest:insert(d, entry)
   end
 end
 
@@ -147,9 +144,9 @@ local function down_prune(abl)
   end
 end
 
-local function up_prune(abl, nearest)
+local function up_prune(abl, knearest)
   for i=1,#abl do
-    if abl[i][2] > nearest[1] then
+    if abl[i][2] > knearest:peek() then
       for j=i,#abl do
         abl[j] = nil
       end
@@ -158,24 +155,25 @@ local function up_prune(abl, nearest)
   end
 end
 
-local function nearest_neighbor_search_core(node, point, metric, nearest)
+local function nearest_neighbor_search_core(node, point, metric, knearest)
   if node:is_leaf() then
-    return nearest_entry(node, metric, nearest)
+    return nearest_entry(node, metric, knearest)
   end
   local abl = active_branch_list(point, node.children)
   down_prune(abl)
   for i=1,#abl do
-    nearest_neighbor_search_core(abl[i][1], point, metric, nearest)
-    up_prune(abl, nearest)
+    nearest_neighbor_search_core(abl[i][1], point, metric, knearest)
+    up_prune(abl, knearest)
     if not abl[i+1] then
       break
     end
   end
-  return nearest
 end
 
-function M.search(node, point)
-  return nearest_neighbor_search_core(node, point, centroid_metric(point), {math.huge})[2]
+function M.search(node, point, k)
+  local knearest = KNearest.new(k or 1)
+  nearest_neighbor_search_core(node, point, centroid_metric(point), knearest)
+  return knearest:to_table()
 end
 
 return M

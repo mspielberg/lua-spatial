@@ -1,7 +1,5 @@
 local BoundingBox = require "rtree.BoundingBox"
 
-local serpent = require "serpent"
-
 --[[
   {
     bounding_box = BoundingBox(...),

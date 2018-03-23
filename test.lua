@@ -8,4 +8,5 @@ for i=1,5 do
   t:insert(data[i])
 end
 
-print(serpent.block(t:nearest_neighbor{2.5,2.5}))
+print(serpent.block(t:nearest_neighbors({2.5,2.5}, 2)))
+print(serpent.block(t:nearest_neighbors({6.5,6.5}, 2)))
