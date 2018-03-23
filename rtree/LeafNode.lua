@@ -20,7 +20,10 @@ function M:tostring()
   for i=1,#self.children-1 do
     s = s..tostring(self.children[i].bounding_box)..","
   end
-  return s..tostring(self.children[#self.children].bounding_box)..")"
+  if next(self.children) then
+    s = s..tostring(self.children[#self.children].bounding_box)
+  end
+  return s..")"
 end
 
 local meta = {
