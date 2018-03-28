@@ -1,7 +1,6 @@
 local BoundingBox = require "rtree.BoundingBox"
 local Entry = require "rtree.Entry"
-local IndexNode = require "rtree.IndexNode"
-local LeafNode = require "rtree.LeafNode"
+local Node = require "rtree.Node"
 local NearestNeighbor = require "rtree.NearestNeighbor"
 
 --[[
@@ -15,7 +14,7 @@ local M = {}
 function M.new(dimension)
   local self = {
     dimension = dimension or 2,
-    root = LeafNode.new{},
+    root = Node.new{},
   }
   return setmetatable(self, {__index = M})
 end
@@ -65,7 +64,7 @@ local function overflow_treatment(self, path, reinsert_levels)
     local new_sibling = node:split()
     if level == 1 then
       -- need a new root
-      self.root = IndexNode.new({node, new_sibling})
+      self.root = Node.new({node, new_sibling})
     else
       if path[level-1]:insert(new_sibling) then
         path[level] = nil

@@ -24,12 +24,8 @@ local function group_bb(nodes, start, last)
   return bb
 end
 
-function M.new(children)
-  local self = {
-    children = children,
-    bounding_box = group_bb(children),
-  }
-  return setmetatable(self, {__index = M})
+function M:is_leaf()
+  return self.height == 0
 end
 
 local function axis_metric(axis)
@@ -111,7 +107,11 @@ end
 function M:insert(child)
   local children = self.children
   children[#children+1] = child
-  self.bounding_box:enlarge_in_place(child.bounding_box)
+  if self.bounding_box == BoundingBox.EMPTY then
+    self.bounding_box = child.bounding_box:clone()
+  else
+    self.bounding_box:enlarge_in_place(child.bounding_box)
+  end
   return #children > MAX_CHILDREN
 end
 
@@ -149,6 +149,31 @@ function M:reinsert_candidate()
     end
   end
   return most_distant
+end
+
+function M:tostring()
+  local s = "Node("..tostring(self.bounding_box)..":"
+  for i=1,#self.children-1 do
+    s = s..tostring(self.children[i].bounding_box)..","
+  end
+  if next(self.children) then
+    s = s..tostring(self.children[#self.children].bounding_box)
+  end
+  return s..")"
+end
+
+local meta = {
+  __index = M,
+  __tostring = M.tostring,
+}
+
+function M.new(children)
+  local self = {
+    bounding_box = group_bb(children),
+    children = children,
+    height = children[1] and children[1].height or 0,
+  }
+  return setmetatable(self, {__index = M})
 end
 
 return M
