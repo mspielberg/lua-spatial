@@ -7,37 +7,42 @@ References:
 ]]
 
 local KNearest = require "rtree.KNearest"
+local Metrics = require "rtree.Metrics"
 
 local M = {}
 
 --[[
-Guarantee: no object inside `bb` can be closer than sqrt(min_dist).
+Guarantee: no object inside `bb` can be closer than min_dist.
 See Definition 2 of [RKV].
 ]]
-local function min_dist(point, bb)
-  local sum = 0
-  for axis=1,#point do
-    local coord = point[axis]
-    local lower = bb[2*axis - 1]
-    local upper = bb[2*axis]
-    local d = 0
-    if coord < lower then
-      d = coord - lower
-    elseif coord > upper then
-      d = coord - upper
-    end
-    sum = sum + d * d
+local function min_dist(point, bb, metric)
+  -- nearest point in bb to point, considering only specified axis
+  local function nearest_on_axis(axis)
+      local coord = point[axis]
+      local lower = bb[2*axis - 1]
+      local upper = bb[2*axis]
+      if coord < lower then
+        return coord - lower
+      elseif coord > upper then
+        return coord - upper
+      end
+      return coord
   end
-  return sum
+
+  local nearest_point = {}
+  for axis=1,#point do
+    nearest_point[axis] = nearest_on_axis(point, bb, axis)
+  end
+  return metric(point, nearest_point)
 end
 
 --[[
-Guarantee: there is at least one object inside `bb` within sqrt(min_max_dist) of point.
+Guarantee: there is at least one object inside `bb` within min_max_dist of point.
 See Definition 4 of [RKV].
 On each axis, take nearest face, farthest point on that face.
 Select nearest of these points, return distance to that point.
 ]]
-local function min_max_dist(point, bb)
+local function min_max_dist(point, bb, metric)
   local centroid = bb:centroid()
 
   -- rm[k] = nearer bb edge coordinate on axis k
@@ -62,19 +67,18 @@ local function min_max_dist(point, bb)
   Vk = (rM[1], rM[2], rM[3], ... rm[k], rM[k+1], rM[k+2], ...)
   i.e., take farther edge coordinate in all axes except k.
   ]]
-
-  local S = 0
-  for axis=1,#point do
-    local d = point[axis] - rM[axis]
-    S = S + d * d
+  local function Vk(k)
+    local out = {}
+    for i=1,#rm do
+      out[i] = (i == k) and rm[i] or rM[i]
+    end
+    return out
   end
 
+  -- choose axis that gives minimum Vk ("min" of max_dist)
   local min = math.huge
   for axis=1,#point do
-    local d1 = point[axis] - rM[axis]
-    local d2 = point[axis] - rm[axis]
-    -- d = distance to point Vk
-    local d = S - d1*d1 + d2*d2
+    local d = metric(point, Vk(axis))
     if d < min then
       min = d
     end
@@ -83,41 +87,23 @@ local function min_max_dist(point, bb)
   return min
 end
 
-local function point_metric(p1)
-  return function(p2)
-    local out = 0
-    for i=1,#p1 do
-      local d = p1[i] - p2[i]
-      out = out + d * d
-    end
-    return out
-  end
-end
-
-local function centroid_metric(point)
-  local pm = point_metric(point)
-  return function(entry)
-    return pm(entry.bounding_box:centroid())
-  end
-end
-
-local function nearest_entry(leaf, metric, knearest)
+local function nearest_entry(leaf, point, metric, knearest)
   local entries = leaf.children
   for i=1,#entries do
     local entry = entries[i]
-    local d = metric(entry)
+    local d = metric(point, entry:centroid())
     knearest:insert(d, entry)
   end
 end
 
-local function active_branch_list(point, children)
+local function active_branch_list(point, children, metric)
   local out = {}
   for i=1,#children do
     local child = children[i]
     out[i] = {
       child,
-      min_dist(point, child.bounding_box),
-      min_max_dist(point, child.bounding_box),
+      min_dist(point, child.bounding_box, metric),
+      min_max_dist(point, child.bounding_box, metric),
     }
   end
   -- sort by min_dist
@@ -159,7 +145,7 @@ local function nearest_neighbor_search_core(node, point, metric, knearest)
   if node:is_leaf() then
     return nearest_entry(node, metric, knearest)
   end
-  local abl = active_branch_list(point, node.children)
+  local abl = active_branch_list(point, node.children, metric)
   down_prune(abl)
   for i=1,#abl do
     nearest_neighbor_search_core(abl[i][1], point, metric, knearest)
@@ -170,9 +156,9 @@ local function nearest_neighbor_search_core(node, point, metric, knearest)
   end
 end
 
-function M.search(node, point, k)
+function M.search(node, point, k, metric)
   local knearest = KNearest.new(k or 1)
-  nearest_neighbor_search_core(node, point, centroid_metric(point), knearest)
+  nearest_neighbor_search_core(node, point, metric, knearest)
   return knearest:to_table()
 end
 

@@ -175,8 +175,8 @@ function M:search(bb)
 end
 
 -- nearest_neighbors returns up to k data with centroids closest to point.
-function M:nearest_neighbors(point, k)
-  return NearestNeighbor.search(self.root, point, k)
+function M:nearest_neighbors(point, k, metric)
+  return NearestNeighbor.search(self.root, point, k, metric)
 end
 
 return M
