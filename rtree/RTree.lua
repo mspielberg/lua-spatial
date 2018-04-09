@@ -29,7 +29,7 @@ local function choose_child(node, to_insert_bb)
     local child = children[i]
     local child_bb = child.bounding_box
     local child_area = child_bb:area()
-    local enlargement = child_bb:enlarge(to_insert_bb):area() - child_bb:area()
+    local enlargement = child_bb:enlarged_area(to_insert_bb) - child_area
     if enlargement < smallest_enlargement or (enlargement == smallest_enlargement and child_area < smallest_area) then
       candidate_child = child
       smallest_enlargement = enlargement

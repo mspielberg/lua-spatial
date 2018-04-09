@@ -1,4 +1,5 @@
 local BoundingBox = require "rtree.BoundingBox"
+--local serpent = require "serpent"
 
 --[[
   {
@@ -11,17 +12,20 @@ local M = {}
 local MIN_CHILDREN = 2
 local MAX_CHILDREN = 4
 
-local function group_bb(nodes, start, last)
+-- set_mbr sets bb to be the minimum bounding rectangle of nodes[start..last]
+local function set_mbr(bb, nodes, start, last)
   start = start or 1
   last = last or #nodes
   if start > last then
     return BoundingBox.EMPTY
   end
-  local bb = nodes[start].bounding_box:clone()
+  local start_bb = nodes[start].bounding_box
+  for i=1,#start_bb do
+    bb[i] = start_bb[i]
+  end
   for i=start+1,last do
     bb:enlarge_in_place(nodes[i].bounding_box)
   end
-  return bb
 end
 
 function M:is_leaf()
@@ -34,7 +38,11 @@ local function axis_metric(axis)
   return function(a,b)
     local a_bb = a.bounding_box
     local b_bb = b.bounding_box
-    return a_bb[lower] < b_bb[lower] or a_bb[upper] < b_bb[upper]
+    local a_l = a_bb[lower]
+    local a_u = a_bb[upper]
+    local b_l = b_bb[lower]
+    local b_u = b_bb[upper]
+    return a_l < b_l or (a_l == b_l and a_u < b_u)
   end
 end
 
@@ -47,6 +55,9 @@ local function sort_by_metric(children, metric)
   return sorted
 end
 
+-- reused and overwritten during split_metrics
+local g1_bb = BoundingBox.new{}
+local g2_bb = BoundingBox.new{}
 local function split_metrics(sorted)
   local margin_sum = 0
   local best_split_index
@@ -54,10 +65,10 @@ local function split_metrics(sorted)
   local best_area = math.huge
   local last = #sorted
   for split_index=MIN_CHILDREN,#sorted-MIN_CHILDREN do
-    local g1_bb = group_bb(sorted, 1, split_index)
-    local g2_bb = group_bb(sorted, split_index + 1, last)
+    set_mbr(g1_bb, sorted, 1, split_index)
+    set_mbr(g2_bb, sorted, split_index + 1, last)
     margin_sum = margin_sum + g1_bb:margin() + g2_bb:margin()
-    local overlap =  g1_bb:intersect(g2_bb):area()
+    local overlap = g1_bb:intersect_area(g2_bb)
     local area = g1_bb:area() + g2_bb:area()
     if overlap < best_overlap or (overlap == best_overlap and area < best_area) then
       best_split_index = split_index
@@ -86,7 +97,12 @@ local function choose_split(self)
 end
 
 function M:update_bounding_box()
-  self.bounding_box = group_bb(self.children)
+  if not next(self.children) then
+    self.bounding_box = BoundingBox.EMPTY
+  elseif self.bounding_box == BoundingBox.EMPTY then
+    self.bounding_box = BoundingBox.new{}
+  end
+  set_mbr(self.bounding_box, self.children)
 end
 
 function M:split()
@@ -99,7 +115,6 @@ function M:split()
   local new_node = self.new(new_node_children)
   self.children = sorted
   self:update_bounding_box()
-  self.bounding_box = group_bb(self.children)
   return new_node
 end
 
@@ -178,11 +193,13 @@ local meta = {
 
 function M.new(children)
   local self = {
-    bounding_box = group_bb(children),
+    bounding_box = BoundingBox.EMPTY,
     children = children,
     height = children[1] and children[1].height and (children[1].height + 1) or 0,
   }
-  return setmetatable(self, meta)
+  setmetatable(self, meta)
+  self:update_bounding_box()
+  return self
 end
 
 return M
