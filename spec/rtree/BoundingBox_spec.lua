@@ -30,9 +30,19 @@ describe("BoundingBox", function()
       assert.are.same(bb, BoundingBox.EMPTY:enlarge(bb))
     end)
 
+    it("should return the area of other from enlarged_area", function()
+      assert.are.equal(bb:area(), bb:enlarged_area(BoundingBox.EMPTY))
+      assert.are.equal(bb:area(), BoundingBox.EMPTY:enlarged_area(bb))
+    end)
+
     it("should return EMPTY from intersect with EMPTY", function()
       assert.are.same(BoundingBox.EMPTY, bb:intersect(BoundingBox.EMPTY))
       assert.are.same(BoundingBox.EMPTY, BoundingBox.EMPTY:intersect(bb))
+    end)
+
+    it("should return 0 area from intersect_area with EMPTY", function()
+      assert.are.equal(0, bb:intersect_area(BoundingBox.EMPTY))
+      assert.are.equal(0, BoundingBox.EMPTY:intersect_area(bb))
     end)
 
     it("should return false for intersects with EMPTY", function()
@@ -125,9 +135,19 @@ describe("BoundingBox", function()
       assert.are.same(bb12, copy)
     end)
 
+    it("calculates enlargement area cheaply", function()
+      assert.are.equal(9, bb1:enlarged_area(bb2))
+      assert.are.equal(9, bb2:enlarged_area(bb1))
+    end)
+
     it("should support intersect", function()
       assert.are.same(bb1_2, bb1:intersect(bb2))
       assert.are.same(bb1_2, bb2:intersect(bb1))
+    end)
+
+    it("calculates intersection area cheaply", function()
+      assert.are.equal(1, bb1:intersect_area(bb2))
+      assert.are.equal(1, bb2:intersect_area(bb1))
     end)
   end)
 

@@ -1,7 +1,12 @@
 --[[
 An N-dimensional hyperrectangle.
-The N-th axis lower bound resides at index 2*N - 1, with the upper bound at index 2*N.
-For a 2-D rectangle with axes in X,Y order and +Y in the downwards direction, that maps to:
+
+The N-th axis lower bound resides at index 2*N - 1, with the upper bound at
+index 2*N.
+
+For a 2-D rectangle with axes in X,Y order and +Y in the downwards direction,
+that maps to:
+
 {
   [1] = left,
   [2] = right,
@@ -83,23 +88,48 @@ function M:contains(other)
   return true
 end
 
+-- enlarge_in_place sets self to the MBR of the union of self and other.
 function M:enlarge_in_place(other)
   if other == M.EMPTY then
     return
   end
   for lower=1,#self,2 do
     local upper = lower + 1
-    self[lower] = min(self[lower], other[lower])
-    self[upper] = max(self[upper], other[upper])
+    if other[lower] < self[lower] then
+      self[lower] = other[lower]
+    end
+    if other[upper] > self[upper] then
+      self[upper] = other[upper]
+    end
   end
 end
 
+-- enlarge returns a new BoundingBox that is the MBR of the union of self and
+-- other.
 function M:enlarge(other)
   local out = self:clone()
   out:enlarge_in_place(other)
   return out
 end
 
+-- enlarged_area returns the equivalent of enlarge(other):area() without
+-- allocating a new BoundingBox.
+function M:enlarged_area(other)
+  if other == M.EMPTY then
+    return self:area()
+  end
+  local area = 1
+  for lower=1,#self,2 do
+    local upper = lower + 1
+    local l = self[lower] < other[lower] and self[lower] or other[lower]
+    local u = self[upper] > other[upper] and self[upper] or other[upper]
+    area = area * (u - l)
+  end
+  return area
+end
+
+-- intersect returns a new BoundingBox that is the intersection of self and
+-- other.
 function M:intersect(other)
   if other == M.EMPTY then
     return M.EMPTY
@@ -111,6 +141,25 @@ function M:intersect(other)
     bounds[upper] = min(self[upper], other[upper])
   end
   return M.new(bounds)
+end
+
+-- intersect_area returns the equivalent of intersect(other):area() without
+-- allocating a new BoundingBox.
+function M:intersect_area(other)
+  if other == M.EMPTY then
+    return 0
+  end
+  local area = 1
+  for lower=1,#self,2 do
+    local upper = lower + 1
+    local l = self[lower] > other[lower] and self[lower] or other[lower]
+    local u = self[upper] < other[upper] and self[upper] or other[upper]
+    if u <= l then
+      return 0
+    end
+    area = area * (u - l)
+  end
+  return area
 end
 
 function M:tostring()
@@ -143,6 +192,12 @@ function EmptyBB.enlarge_in_place(_)
 end
 function EmptyBB.enlarge(_, other)
   return other:clone()
+end
+function EmptyBB.enlarged_area(_, other)
+  return other:area()
+end
+function EmptyBB.intersect_area(_)
+  return 0
 end
 function EmptyBB.intersect(_)
   return M.EMPTY
