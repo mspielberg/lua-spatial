@@ -153,27 +153,36 @@ end
 
 function M:tostring()
   local s = "Node("..tostring(self.bounding_box)..":"
-  for i=1,#self.children-1 do
-    s = s..tostring(self.children[i].bounding_box)..","
-  end
-  if next(self.children) then
-    s = s..tostring(self.children[#self.children].bounding_box)
+  if self.height == 0 then
+    for i=1,#self.children-1 do
+      s = s..tostring(self.children[i].bounding_box)..","
+    end
+    if next(self.children) then
+      s = s..tostring(self.children[#self.children].bounding_box)
+    end
+  else
+    for i=1,#self.children-1 do
+      s = s..tostring(self.children[i])..","
+    end
+    if next(self.children) then
+      s = s..tostring(self.children[#self.children])
+    end
   end
   return s..")"
 end
 
 local meta = {
   __index = M,
-  __tostring = M.tostring,
+  --__tostring = M.tostring,
 }
 
 function M.new(children)
   local self = {
     bounding_box = group_bb(children),
     children = children,
-    height = children[1] and children[1].height or 0,
+    height = children[1] and children[1].height and (children[1].height + 1) or 0,
   }
-  return setmetatable(self, {__index = M})
+  return setmetatable(self, meta)
 end
 
 return M

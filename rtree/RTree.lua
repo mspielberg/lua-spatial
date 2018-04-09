@@ -41,11 +41,8 @@ end
 
 local function choose_subtree(self, to_insert_bb, desired_level)
   local path = {self.root}
-  for level=1,desired_level do
-    if path[level]:is_leaf() then
-      return path
-    end
-    path[level+1] = choose_child(path[level], to_insert_bb)
+  for level=2,desired_level do
+    path[level] = choose_child(path[level-1], to_insert_bb)
   end
   return path
 end
@@ -87,15 +84,16 @@ function M:insert(datum)
   if #entry.bounding_box ~= self.dimension * 2 then
     error("entry with bounding box of "..#entry.bounding_box.." elements does not match dimension of "..self.dimension)
   end
-  insert(self, entry, {}, math.huge)
+  insert(self, entry, {}, self.root.height + 1)
 end
 
 local function find_leaf(node, entry, path)
+  local level = #path + 1
   local children = node.children
   if node:is_leaf() then
     for i=1,#children do
       if children[i].datum == entry.datum then
-        path[#path+1] = children[i]
+        path[level] = children[i]
         return path
       end
     end
@@ -103,7 +101,7 @@ local function find_leaf(node, entry, path)
     for i=1,#children do
       local child = children[i]
       if child.bounding_box:contains(entry.bounding_box) then
-        path[#path+1] = child
+        path[level] = child
         if find_leaf(child, entry, path) then
           return path
         end
