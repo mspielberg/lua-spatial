@@ -1,7 +1,7 @@
 --[[
 An N-dimensional hyperrectangle.
 The N-th axis lower bound resides at index 2*N - 1, with the upper bound at index 2*N.
-For a 2-D rectangle with axes in X,Y order and a +Y in the downwards direction, that maps to:
+For a 2-D rectangle with axes in X,Y order and +Y in the downwards direction, that maps to:
 {
   [1] = left,
   [2] = right,
@@ -58,6 +58,9 @@ function M:margin()
 end
 
 function M:intersects(other)
+  if other == M.EMPTY then
+    return false
+  end
   for lower=1,#self,2 do
     local upper = lower + 1
     if self[lower] > other[upper] or self[upper] < other[lower] then
@@ -68,6 +71,9 @@ function M:intersects(other)
 end
 
 function M:contains(other)
+  if other == M.EMPTY then
+    return false
+  end
   for lower=1,#self,2 do
     local upper = lower + 1
     if self[lower] > other[lower] or self[upper] < other[upper] then
@@ -78,6 +84,9 @@ function M:contains(other)
 end
 
 function M:enlarge_in_place(other)
+  if other == M.EMPTY then
+    return
+  end
   for lower=1,#self,2 do
     local upper = lower + 1
     self[lower] = min(self[lower], other[lower])
@@ -86,15 +95,15 @@ function M:enlarge_in_place(other)
 end
 
 function M:enlarge(other)
-  if other == M.EMPTY then
-    return self
-  end
   local out = self:clone()
   out:enlarge_in_place(other)
   return out
 end
 
 function M:intersect(other)
+  if other == M.EMPTY then
+    return M.EMPTY
+  end
   local bounds = {}
   for lower=1,#self,2 do
     local upper = lower + 1
@@ -126,21 +135,29 @@ end
 function EmptyBB.contains(_)
   return false
 end
+function EmptyBB.intersects(_)
+  return false
+end
 function EmptyBB.enlarge_in_place(_)
   error("attempted to modify EmptyBB")
 end
-function EmptyBB.intersect(other)
+function EmptyBB.enlarge(_, other)
   return other:clone()
+end
+function EmptyBB.intersect(_)
+  return M.EMPTY
 end
 function EmptyBB.tostring()
   return "EmptyBB()"
 end
 
+setmetatable(EmptyBB, { __index = M })
 local EmptyBB_meta = {
-  __index = M,
+  __index = EmptyBB,
+  __newindex = function() error("attempted to modify EmptyBB") end,
   __tostring = EmptyBB.tostring,
 }
-M.EMPTY = setmetatable(EmptyBB, EmptyBB_meta)
+M.EMPTY = setmetatable({}, EmptyBB_meta)
 
 local meta = {
   name = "BoundingBox",
@@ -155,6 +172,10 @@ end
 function M.new(coords)
   if coords.left_top then
     return new_from_factorio(coords)
+  end
+
+  if #coords % 2 ~= 0 then
+    error("BoundingBox must have even number of coordinates for new")
   end
 
   for lower=1,#coords,2 do
