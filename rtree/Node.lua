@@ -32,6 +32,7 @@ function M:is_leaf()
   return self.height == 0
 end
 
+-- sort by lower bound on axis, break ties by upper bound.
 local function axis_metric(axis)
   local lower = axis
   local upper = axis + 1
@@ -46,54 +47,57 @@ local function axis_metric(axis)
   end
 end
 
-local function sort_by_metric(children, metric)
+local function sort_on_axis(children, axis)
   local sorted = {}
   for i=1,#children do
     sorted[i] = children[i]
   end
-  table.sort(sorted, metric)
+  table.sort(sorted, axis_metric(axis))
   return sorted
 end
 
 -- reused and overwritten during split_metrics
 local g1_bb = BoundingBox.new{}
 local g2_bb = BoundingBox.new{}
+-- pick split based on minimum overlap, break ties by minimum total area.
 local function split_metrics(sorted)
   local margin_sum = 0
-  local best_split_index
+  local best_num_before_split
   local best_overlap = math.huge
   local best_area = math.huge
   local last = #sorted
-  for split_index=MIN_CHILDREN,#sorted-MIN_CHILDREN do
-    set_mbr(g1_bb, sorted, 1, split_index)
-    set_mbr(g2_bb, sorted, split_index + 1, last)
+  for num_before_split=MIN_CHILDREN,#sorted-MIN_CHILDREN do
+    set_mbr(g1_bb, sorted, 1, num_before_split)
+    set_mbr(g2_bb, sorted, num_before_split + 1, last)
     margin_sum = margin_sum + g1_bb:margin() + g2_bb:margin()
     local overlap = g1_bb:intersect_area(g2_bb)
     local area = g1_bb:area() + g2_bb:area()
     if overlap < best_overlap or (overlap == best_overlap and area < best_area) then
-      best_split_index = split_index
+      best_num_before_split = num_before_split
       best_overlap = overlap
       best_area = area
     end
   end
-  return margin_sum, best_split_index
+  return margin_sum, best_num_before_split
 end
 
+-- pick axis that gives post-split MBRs that are most square, not oblong, by
+-- picking minimum margin (perimeter).
 local function choose_split(self)
   local children = self.children
   local best_sorted
-  local best_split_index
+  local best_num_before_split
   local smallest_margin = math.huge
   for axis=1,#self.bounding_box/2 do
-    local sorted = sort_by_metric(children, axis_metric(axis))
-    local margin_sum, split_index = split_metrics(sorted)
+    local sorted = sort_on_axis(children, axis)
+    local margin_sum, num_before_split = split_metrics(sorted)
     if margin_sum < smallest_margin then
       best_sorted = sorted
-      best_split_index = split_index
+      best_num_before_split = num_before_split
       smallest_margin = margin_sum
     end
   end
-  return best_sorted, best_split_index
+  return best_sorted, best_num_before_split
 end
 
 function M:update_bounding_box()
@@ -106,13 +110,14 @@ function M:update_bounding_box()
 end
 
 function M:split()
-  local sorted, split_index = choose_split(self)
-  local new_node_children = {}
-  for i=1,#sorted-split_index do
-    new_node_children[i] = sorted[i + split_index]
-    sorted[i + split_index] = nil
+  local sorted, num_before_split = choose_split(self)
+  local num_after_split = #sorted - num_before_split
+  local children_after_split = {}
+  for i=1,num_after_split do
+    children_after_split[i] = sorted[i + num_before_split]
+    sorted[i + num_before_split] = nil
   end
-  local new_node = self.new(new_node_children)
+  local new_node = self.new(children_after_split)
   self.children = sorted
   self:update_bounding_box()
   return new_node
